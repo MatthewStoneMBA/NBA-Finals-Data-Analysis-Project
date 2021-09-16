@@ -1,0 +1,851 @@
+---
+title: 'NBA Finals: When Stats Matter'
+author: "Matt Stone"
+date: "12/14/2019"
+output:
+  html_document:
+    css: NBA-Finals-When-Stats-Matter-copy.knit.md
+    df_print: paged
+    fig_height: 5
+    fig_width: 8.5
+    highlight: default
+    number_sections: yes
+    theme: readable
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+---
+
+# The Research Questions
++ What key statistics most impact wins?
++ What statistics have been changing throughout the years?
+  
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+library(rmarkdown)
+library(tidyverse)
+library(knitr)
+library(skimr)
+library(wesanderson)
+library(dplyr)
+library(ggthemes)
+library(moderndive)
+library(purrr)
+library(broom)
+library(GGally)
+library(ggtext)
+```
+
+
+```{r,echo=FALSE}
+matt_theme <- theme_minimal() +
+    theme(
+      text = element_text(family = "Palatino", color = "gray25"),
+      plot.subtitle = element_text(size = 12),
+      plot.caption = element_text(color = "gray30"),
+      plot.background = element_rect(fill = "gray95"),
+      plot.margin = unit(c(5, 10, 5, 10), units = "mm")
+    )
+theme_set(matt_theme)
+library(wesanderson)
+
+scale_colour_discrete <- function(...) {
+  scale_colour_manual(..., values = wes_palette(n=8, name="Moonrise3", type = "continuous"))
+}
+scale_fill_discrete <- function(...) {
+  scale_fill_manual(..., values = wes_palette(n=8, name="Moonrise3", type = "continuous"))
+}
+
+```
+
+
+
+```{r, fig.align='center', echo=FALSE}
+championsdata <- read.csv("/Users/Rose/Desktop/Masters In Data Science/Data Science with R/Championsdata.csv")
+```
+
+
+## Data Cleaning
+```{r}
+champ <- championsdata %>% 
+  mutate(Team=str_replace_all(Team,"'", "")) %>% 
+  mutate(Team=str_replace(Team,"Warriorrs","Warriors"))
+
+champ
+  
+```
+
+# Data Exploration
+
+```{r}
+glimpse(champ)
+
+# Year: The year the series was played
+# Team: The name of the team.
+# Win: 1 = Win. 0 = Loss
+# Home: 1 = Home team. 0 = Away team.
+# Game: Game #
+# MP - Total minutes played. 
+# FG - Field goals made
+# FGA - Field goal attempts
+# FGP - Field Goal Percentage
+# TP - 3 Point Field Goals Made
+# TPA - Three point attempts
+# TPP - three point percentage
+# FT - Free throws made
+# FTA - Free throws attempted
+# FTP - Free throw percentage
+# ORB - Offensive rebounds
+# DRB - Defensive rebounds
+# TRB - Total rebounds
+# AST - Assists
+# STL - Steals
+# BLK - Blocks
+# TOV - Turnovers
+# PF - Personal fouls
+# PTS - points scored
+
+```
+
+## Every Team in the Dataset 
+```{r, fig.align='center'}
+champ %>%
+  distinct(Team)
+```
+
+
+## How Long were the Finals Series? 
+
+```{r, fig.align='center'}
+champ %>%
+  group_by(Team) %>%
+  count(Year) %>% arrange(Year) %>% 
+  filter(n == 7)
+
+champ %>%
+  group_by(Team) %>%
+  count(Year) %>% arrange(Year) %>% 
+  filter(n == 6)
+
+champ %>%
+  group_by(Team) %>%
+  count(Year) %>% arrange(Year) %>% 
+  filter(n == 5)
+
+champ %>%
+  group_by(Team) %>%
+  count(Year) %>% arrange(Year) %>% 
+  filter(n == 4)
+
+champ %>%
+  group_by(Team) %>%
+  count(Year) %>% arrange(Year) %>% 
+  filter(n == 4 | n == 5 | n == 6 | n == 7) %>% 
+  ggplot(aes(n)) + geom_bar() + 
+  xlab("Games in a Series") + ylab("Count of Teams") + 
+  labs(title="Distribution of Games in a Series by Team from 1980-2018") + matt_theme
+```
+
+
+## Summarized Averages of Each Statistic
+```{r, message=FALSE, warning=FALSE}
+champ
+
+champ_average1 <- champ %>%
+  group_by(Year, Team) %>%
+  summarise(.,
+    average_points = mean(PTS),
+    average_FGM = mean(FG),
+    average_FGA = mean(FGA),
+    average_FGP = mean(FGP),
+    average_3 = mean(TP),
+    average_3A = mean(TPA),
+    average_3Pct = mean(TPP),
+    average_FT = mean(FT),
+    average_FTA = mean(FTA),
+    average_ORB = mean(ORB),
+    average_DRB = mean(DRB),
+    average_TRB = mean(TRB),
+    average_AST = mean(AST),
+    average_STL = mean(STL),
+    average_BLK = mean(BLK),
+    average_TOV = mean(TOV),
+    average_PF = mean(PF)) %>% 
+  mutate(Champ = 1)
+
+
+champ_average1
+
+
+# Highest Average Points per Series
+head(champ_average1 %>% select(Team, average_points) %>% 
+  arrange(desc(average_points)))
+
+
+# Highest Average Field Goal Percentage per Series Compared to Attempts and Makes
+head(champ_average1 %>% select(Team, average_FGP, average_FGA, average_FGM) %>% 
+  arrange(desc(average_FGP)))
+
+
+# Highest Average Rebound per Series: Offensive and Defensive 
+head(champ_average1 %>% select(Team, average_TRB, average_ORB, average_DRB) %>% 
+  arrange(desc(average_TRB)))
+
+
+# Most Blocks per Series
+head(champ_average1 %>% select(Team, average_BLK) %>% 
+  arrange(desc(average_BLK)))
+
+
+# 3-Pointer Percentage, Attempts and Makes
+head(champ_average1 %>% select(Team, average_3Pct, average_3A, average_3) %>% 
+  arrange(desc(average_3Pct)))
+
+
+# Most Assists per Series
+head(champ_average1 %>% select(Team, average_AST) %>% 
+  arrange(desc(average_AST)))
+```
+
+
+## Most Championships Per Team
+
+```{r, fig.align = 'center'}
+champ_average1 %>%
+  group_by(Team) %>%
+  summarise(count = n()) %>% 
+  ggplot(., aes(x = reorder(Team, count), 
+                count, 
+                fill = Team)) + 
+  geom_col() + 
+  labs(title="<span style='color:#660099;'>**Lakers**</span>, 
+    <span style='color:#CC0000;'>**Bulls**</span>, and
+    <span style='color:gray49;'>**Spurs**</span> </span> Dominant NBA Franchises", 
+       subtitle = "Since 1980",
+    x = "Teams",
+    y = "Number of Championships") + 
+  scale_fill_manual(values=c("#CC0000",
+                             "coral4", 
+                             "darkgreen", 
+                             "firebrick4", 
+                             "#660099", 
+                             "deepskyblue3", 
+                             "lightskyblue", 
+                             "firebrick", 
+                             "dodgerblue4", 
+                             "gray49", 
+                             "blue")) + 
+  theme(axis.text.x = element_text(hjust = 1,
+                                   colour = "black",
+                                   family = "serif",
+                                   size = 11),
+        axis.text.y = element_text(colour = "black",
+                                   family = "serif",
+                                   size = 11),
+        axis.title.x = element_text(colour = "black",
+                                    family = "serif"),
+        axis.title.y = element_blank(),
+        legend.position = "none",
+        
+        plot.subtitle = element_text(size = 10, 
+                                     family = "serif",
+                                     face = "bold.italic"),
+        plot.title = element_markdown(size = 15,
+                                      family = "serif",
+                                      face = "bold")) + 
+  coord_flip() +
+  scale_y_continuous(breaks = seq(from = 0, to = 10, by = 2))
+
+```
+
+## Most Championships Per Team
+```{r}
+champ_average1 %>%
+  group_by(Team) %>%
+  summarise(count = n()) %>% 
+  ggplot(., aes(x = reorder(Team, count), 
+                count, 
+                fill = Team)) + 
+  geom_col() + 
+  labs(title="<span style='color:#660099;'>**Lakers**</span>, 
+    <span style='color:#CC0000;'>**Bulls**</span>, and
+    <span style='color:grey42;'>**Spurs**</span> </span> Most Dominant NBA Franchises", 
+       subtitle = "Since 1980",
+    x = "Teams",
+    y = "Number of Championships") + 
+  scale_fill_manual(values=c("#CC0000",
+                             "grey79", 
+                             "grey79", 
+                             "grey79", 
+                             "#660099", 
+                             "grey79", 
+                             "grey79", 
+                             "grey79", 
+                             "grey79", 
+                             "grey40", 
+                             "grey79")) + 
+  theme(axis.text.x = element_text(hjust = 1,
+                                   colour = "black",
+                                   family = "serif",
+                                   size = 11),
+        axis.text.y = element_text(colour = "black",
+                                   family = "serif",
+                                   size = 11),
+        axis.title.x = element_text(colour = "black",
+                                    family = "serif"),
+        axis.title.y = element_blank(),
+        legend.position = "none",
+        plot.subtitle = element_text(size = 10, 
+                                     family = "serif",
+                                     face = "bold.italic"),
+        plot.title = element_markdown(size = 15,
+                                      family = "serif",
+                                      face = "bold")) + 
+  coord_flip() +
+  scale_y_continuous(breaks = seq(from = 0, to = 10, by = 2))
+```
+
+
+```{r}
+champ_average1 %>%
+  group_by(Team) %>%
+  summarise(count = n()) %>% 
+  ggplot(., aes(x = reorder(Team, count), 
+                count, 
+                fill = Team)) + 
+  geom_col() + 
+  labs(title="<span style='color:#552583;'>**Lakers**</span>, 
+    <span style='color:#CC0000;'>**Bulls**</span>, 
+    <span style='color:grey40;'>**Spurs**</span>, and
+    <span style='color:#008348;'>**Celtics**</span> </span> Most Dominant NBA Franchises", 
+       subtitle = "Since 1980",
+    x = "Teams",
+    y = "Number of Championships") + 
+  scale_fill_manual(values=c("#CC0000",
+                             "grey79", 
+                             "#008348", 
+                             "grey79", 
+                             "#552583", 
+                             "grey79", 
+                             "grey79", 
+                             "grey79", 
+                             "grey79", 
+                             "grey40", 
+                             "grey79")) + 
+  theme(axis.text.x = element_text(hjust = 1,
+                                   colour = "black",
+                                   family = "serif",
+                                   size = 11),
+        axis.text.y = element_text(colour = "black",
+                                   family = "serif",
+                                   size = 11),
+        axis.title.x = element_text(colour = "black",
+                                    family = "serif"),
+        axis.title.y = element_blank(),
+        legend.position = "none",
+        plot.subtitle = element_text(size = 10, 
+                                     family = "serif",
+                                     face = "bold.italic"),
+        plot.title = element_markdown(size = 14,
+                                      family = "serif",
+                                      face = "bold")) + 
+  coord_flip() +
+  scale_y_continuous(breaks = seq(from = 0, to = 10, by = 2))
+```
+
+
+### The most NBA Finals Championships from this time span is the Los Angeles Lakers at 10, then the Chicago Bulls at 6, followed by the San Antonio Spurs at 5 and Boston Celtics at 4.
+
+## Top 4 Franchises: How do they compare in points?
+```{r, fig.align='center'}
+champ_average1 %>% filter(Team == "Lakers" | Team == "Spurs" | Team == "Bulls" | Team == "Celtics") %>% 
+  select(Year, Team, average_points) %>%
+  arrange(desc(average_points)) 
+```
+
+
+## Championship Team's Average Points in each Year 
+
+```{r, fig.align='center'}
+
+champ_average1 %>%
+    filter(Year < 2000 | Year >= 2000) %>%
+    ggplot(aes(x = Year, y = Team, color = Team, size = average_points)) + geom_jitter(stat="identity", show.legend = TRUE, alpha = .6) + 
+  scale_color_manual(values=c("#CC0000", "coral4", "darkgreen", "firebrick4", 
+                             "#660099", "deepskyblue3", "lightskyblue", "firebrick", "dodgerblue4", "gray44", "blue")) + theme(legend.title = element_text(colour="black", size=10, 
+                                      face="bold")) + labs(title="Championship Team's Average Points in each Year", size = "Average Points")
+
+
+
+```
+
+
+
+## Top 4 Teams: Average Points and Field Goal Attempts
+
+```{r, fig.align='center'}
+champ_average1 %>%
+filter(Team == "Bulls" | Team == "Spurs" | Team == "Lakers" | Team =="Celtics") %>% 
+    ggplot(aes(Year, average_points, color = Team, size = average_FGA)) + geom_point(alpha = .6) + facet_grid(~Team) + theme(axis.text.x = element_text(angle = 90, hjust = 10)) + scale_color_manual(values=c("#CC0000", "darkgreen", "#660099", "gray14")) + labs(title = "Top 4 Championship Team's Average Points & Average FG Attempts", x = "Year", y = "Average Points per Series", size = "Average FG Attempt")
+```
+
+## Now Lets see Average Points on a Line graph - First: Bulls
+
+```{r, fig.align='center'}
+champ_average1 %>%
+filter(Team == "Bulls") %>% 
+    ggplot(aes(Year, average_points, color = Team)) + geom_line() + geom_point() + scale_color_manual(values=c("#CC0000")) + labs(title = "The Bulls Average Points", x = "Year", y = "averageerage Points per Series", size = "Average FG Attempt") + facet_grid(Team~.)
+
+```
+
+
+
+## 1990 - 1993 Makes Sense! - "The Goat"
+
+
+<center>
+
+![""](data:image/jpeg;base64,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)
+
+
+
+## Average Points: Celtics & Lakers
+
+```{r, fig.align='center'}
+champ_average1 %>%
+filter(Team == "Lakers" | Team =="Celtics") %>%
+  filter(Year <= 1990) %>%
+    ggplot(aes(Year, average_points, color = Team)) + geom_line() + geom_point() + scale_color_manual(values=c("darkgreen", "#660099")) + labs(title = "Celtics vs Lakers Average Points", x = "Year", y = "Average Points per Series", size = "Average FG Attempt") + facet_grid(Team~.)
+```
+
+
+
+## Battle of the 80s
+![''](https://images-na.ssl-images-amazon.com/images/I/51pzAhTqQBL.jpg)
+
+## 3-Peat from 2000 - 2003
+
+```{r, fig.align='center'}
+champ_average1 %>%
+filter(Team == "Lakers" | Team =="Celtics") %>%
+    ggplot(aes(Year, average_points, color = Team)) + geom_line() + geom_point() + scale_color_manual(values=c("darkgreen", "#660099")) + labs(title = "Rivaly Measured by Team's Average Points", x = "Year", y = "Average Points per Series", size = "Average FG Attempt") + facet_grid(Team~.)
+```
+
+
+## Shaq & Kobe 3-Peat
+
+
+![''](data:image/jpeg;base64,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)
+
+
+
+
+## Reign of Spurs
+
+```{r, fig.align='center'}
+champ_average1 %>%
+filter(Team == "Spurs") %>% 
+    ggplot(aes(Year, average_points, color = Team)) + geom_line() + geom_point() + scale_color_manual(values=c("gray44")) + labs(title = "Reign of the Spurs: Average Points", x = "Year", y = "Average Points per Series", size = "Average FG Attempt") + facet_grid(Team~.)
+```
+
+## More Championships
+
+![''](https://img.bleacherreport.net/img/article/media_slots/photos/001/196/944/74633182-manu-ginobili-tim-duncan-head-coach-gregg-popovich-and_crop_exact.jpg?w=2975&h=2048&q=85)
+
+</center>
+
+## Now Let's Compare them all:
+
+```{r, fig.align='center'}
+champ_average1 %>%
+filter(Team == "Lakers" | Team == "Bulls" | Team == "Spurs" | Team =="Celtics") %>% 
+    ggplot(aes(Year, average_points, color = Team)) + geom_line() + geom_point() + scale_color_manual(values=c("#CC0000", "darkgreen", "#660099", "gray14")) + labs(title = "Comparing Top 4 Championship Team's Average Points", x = "Year", y = "Average Points per Series", size = "Average FG Attempt") + facet_grid(Team~.)
+```
+
+
+
+## What Stats have Changed over the Years?
+
+```{r, fig.align='center'}
+champ_average1 %>%
+  select(Year, average_3, average_3A) %>%
+  gather(key = "AttemptsVMake", value = "value", 2:3) %>%
+ ggplot(aes(Year, value, color = AttemptsVMake)) + geom_line() + geom_point() + labs(title = "Time Series of 3-Point Attempts", x = "Year", y = "Average 3-Point Attempts", color = "Average 3FG Attempt") + scale_color_manual(labels = c("3's Made", "3's Attempted"), values=c("#CC0000", "darkgreen"))
+```
+
+## Three's have Gone up, has that impacted other stats? Turnovers?
+
+```{r, fig.align='center'}
+champ_average1 %>% get_correlation(formula = average_TOV ~ average_3A)
+
+champ_average1 %>%
+  select(Year, average_3A, average_TOV, Team) %>%
+  gather(key = "AttemptVTO", value = "value", 2:3) %>%
+ ggplot(aes(Year, value, color = AttemptVTO)) + geom_line() + geom_point() + labs(x = "Year", y = "", color = "Average 3FG Attempt") + scale_color_manual(labels = c("3's Attempted", "Turnovers"), values=c("#CC0000", "darkgreen")) + geom_smooth(method = "lm", size = .3, ymax = FALSE, ymin = FALSE)
+```
+
+## Not pretty, but how do Turnovers Look over time?
+
+```{r, fig.align='center'}
+
+champ_average1 %>%
+ ggplot(aes(Year, average_TOV, color = Team)) + geom_line() + geom_point() + labs(title = "Average Turnovers by Team", x = "Year", y = "Number of Turnovers", color = "Teams") + scale_color_manual(values=c("#CC0000", "coral4", "darkgreen", "firebrick4", 
+                             "#660099", "deepskyblue3", "lightskyblue", "firebrick", "dodgerblue4", "gray44", "blue"))
+
+```
+
+
+## What about 3 pointers?
+
+```{r, fig.align='center'}
+
+champ_average1 %>%
+ ggplot(aes(Year, average_3A, color = Team)) + geom_line() + geom_point() + labs(title = "Average 3-Pointer's Attempted by Team", x = "Year", y = "Number of 3-Pointers Attempted", color = "Teams") + scale_color_manual(values=c("#CC0000", "coral4", "darkgreen", "firebrick4", 
+                             "#660099", "deepskyblue3", "lightskyblue", "firebrick", "dodgerblue4", "gray44", "blue"))
+
+```
+
+
+## Looking at the Warriors 3 Attempts & Turnovers
+
+```{r}
+champ_average1 %>%
+  select(Year, average_3A, average_TOV, Team) %>%
+  filter(Team == "Warriors") %>% 
+  gather(key = "AttemptVTO", value = "value", 2:3) %>%
+ ggplot(aes(Year, value, color = AttemptVTO)) + geom_line() + geom_point() + labs(title = "Warriors 3-Point Attempts vs Turnovers", x = "Year", y = "", color = "") + scale_color_manual(labels = c("3's Attempted", "Turn Overs"), values=c("blue", "#CC0000"))
+```
+
+
+
+
+
+
+# Correlation Matrices
+```{r, warning=FALSE}
+champ %>% select(Win, Home, FG, FGA, FGP, TP, TPA, TPP, FT, FTA, FTP, ORB, DRB, TRB, AST, STL, BLK, TOV, PF, PTS) %>% drop_na() %>% cor(., method = c("pearson")) %>% list() %>% map_df(tidy)
+
+
+```
+
+## Correlation of between Win and all variables
+```{r}
+correlation <- champ  %>% select(Win, Home, FG, FGA, FTP, FGP, TP, TPA, TPP, FT, FTA, ORB, DRB, TRB, AST, STL, BLK, TOV, PF, PTS) %>% drop_na() 
+
+head(cor(correlation, method = c("pearson")) %>% list() %>% map_df(tidy), 1)
+
+```
+
+## Comparing Correlation Matrices from Pre 1999 and Post 1999
+
+```{r, warning= FALSE}
+corBefore2000 <- champ %>%  filter(Year < 1999) %>% select(Win, Home, FG, FGA, FGP, TP, TPA, TPP, FT, FTA, ORB, FTP, DRB, TRB, AST, STL, BLK, TOV, PF, PTS) %>% drop_na() 
+
+corAfter2000 <- champ %>%  filter(Year >= 1999) %>% select(Win, Home, FG, FGA, FGP, TP, TPA, TPP, FT, FTA,FTP, ORB, DRB, TRB, AST, STL, BLK, TOV, PF, PTS) %>% drop_na() 
+
+
+(head(cor(corBefore2000, method = c("pearson")) %>% list() %>% map_df(tidy), 1))
+(head(cor(corAfter2000, method = c("pearson")) %>% list() %>% map_df(tidy), 1))
+
+
+```
+
+
+# Modeling
+
+```{r}
+champ1 <- correlation 
+
+# Base model with all Variables
+basemodel <- lm(Win ~ Home + FG + FGA + FGP + TP + TPA + TPP + FT + FTA + FTP + ORB + DRB + TRB + AST + STL + BLK + TOV + PF + PTS, data = champ1)
+
+# Base Estimates
+basemodel %>% get_regression_table()
+
+# Stepwise function
+step(basemodel)
+
+# Regression Summaries
+get_regression_summaries(lm(formula = Win ~ FG + FGA + TP + TPA + FT + FTA + ORB + DRB + 
+    STL + TOV, data = champ1))
+get_regression_table(lm(formula = Win ~ FG + FGA + TP + TPA + FT + FTA + ORB + DRB + 
+    STL + TOV, data = champ1))
+
+```
+### Base Model:
++ R2 of .561
++ MSE = 0.0911
++ Highest predictor was Field goal's made and Offensive rebounds
+
+
+
+## Comparing the "Base Model" to see if it fits better Pre-2000 or Post-2000
+
+```{r}
+# Fitting Base Model to Pre-2000
+
+basemodel_pre2000 <- lm(formula = Win ~ FG + FGA + TP + TPA + FT + FTA + ORB + DRB + STL + TOV, data = corBefore2000)
+
+# Regression Summaries & Table
+get_regression_summaries(basemodel_pre2000)
+get_regression_table(basemodel_pre2000)
+
+# Fitting base model to Post-2000
+
+basemodel_pst2000 <- lm(formula = Win ~ FG + FGA + TP + TPA + FT + FTA + ORB + DRB + STL + TOV, data = corAfter2000)
+
+
+# Regression Summaries & Table
+get_regression_summaries(basemodel_pst2000)
+get_regression_table(basemodel_pst2000)
+```
+### Pre 2000: 
++ R2 of .579
++ MSE = .0803
++ Three pointer's made was highest predictor
+
+### Post 2000:
++ R2 of .579
++ 0.0848
++ Free Throw makes were highest predictor
+
+
+
+## Model Pre 2000
+
+```{r}
+model2 <- lm(Win ~ Home + FG + FGA + FGP + TP + TPA + TPP + FT + FTA + FTP + ORB + DRB + TRB + AST + STL + BLK + TOV + PF + PTS, data = corBefore2000)
+
+# Regression Table & Summaries
+model2 %>% get_regression_table()
+model2 %>% get_regression_summaries()
+
+# Stepwise function
+step(model2)
+
+# Regression Summaries and Table of Pre 2000 model
+get_regression_summaries(lm(formula = Win ~ FG + TP + TPA + FTA + FTP + ORB + DRB + 
+    STL + TOV, data = corBefore2000))
+get_regression_table(lm(formula = Win ~ FG + TP + TPA + FTA + FTP + ORB + DRB + 
+    STL + TOV, data = corBefore2000))
+
+```
+### Pre 2000 Model
++ Low R2
++ Three pointers percentage was highest predictor
++ MSE = 0.1368
+
+
+## Model post 2000
+
+```{r}
+model3 <- lm(Win ~ Home + FG + FGA + FGP + TP + TPA + TPP + FT + FTA + FTP + ORB + DRB + TRB + AST + STL + BLK + TOV + PF + PTS, data = corAfter2000)
+
+# Regression Table & Summaries
+model3 %>% get_regression_table()
+model3 %>% get_regression_summaries()
+
+# Stepwise function
+step(model3)
+
+# Regression Summaries of Post 2000 model
+get_regression_summaries(lm(formula = Win ~ FG + FGA + TP + TPA + FTA + FTP + DRB + AST + 
+    STL + BLK + TOV, data = corAfter2000))
+get_regression_table(lm(formula = Win ~ FG + FGA + TP + TPA + FTA + FTP + DRB + AST + 
+    STL + BLK + TOV, data = corAfter2000))
+```
+### Model Post 2000:
++ R2 of .612
++ MSE = 0.078
++ Highest predictor was Free Throw percentage
+
+
+
+# Regression Through the Decades
+
+## Regression of the 80's
+
+```{r}
+reg80s <- champ %>% filter(Year >= 1980 & Year <= 1989) %>% select(Win, Home, FG, FGA, FGP, TP, TPA, TPP, FT, FTA,FTP, ORB, DRB, TRB, AST, STL, BLK, TOV, PF, PTS) %>% drop_na()
+
+# Using all Variables
+model80s <- lm(Win ~ Home + FG + FGA + FGP + TP + TPA + TPP + FT + FTA + FTP + ORB + DRB + TRB + AST + STL + BLK + TOV + PF + PTS, data = reg80s)
+
+
+# Regression Table & Summaries
+model80s %>% get_regression_table()
+model80s %>% get_regression_summaries()
+
+# Stepwise function 
+step(model80s)
+
+# Regression Summaries & Table of 90s Model
+get_regression_summaries(lm(formula = Win ~ FG + FGP + TPA + FT + ORB + DRB + TOV, data = reg80s))
+get_regression_table(lm(formula = Win ~ FG + FGP + TPA + FT + ORB + DRB + TOV, data = reg80s))
+
+```
+### Regression of the 80's after stepwise:
++ R2 of .73
++ MSE = 0.059
++ Highest Predictor is Field goal percentage
+
+
+## Regression of the 90's
+
+```{r}
+reg90s <- champ %>% filter(Year >= 1990 & Year <= 1999) %>% select(Win, Home, FG, FGA, FGP, TP, TPA, TPP, FT, FTA,FTP, ORB, DRB, TRB, AST, STL, BLK, TOV, PF, PTS) %>% drop_na()
+
+
+model90s <- lm(Win ~ Home + FG + FGA + FGP + TP + TPA + TPP + FT + FTA + FTP + ORB + DRB + TRB + AST + STL + BLK + TOV + PF + PTS, data = reg90s)
+
+# Regression Table & Summaries
+model90s %>% get_regression_table()
+model90s %>% get_regression_summaries()
+
+# Stepwise function
+step(model90s)
+
+# Regression Summaries & Table of 90s Model
+get_regression_summaries(lm(formula = Win ~ FG + FGP + TPP + FTA + FTP + ORB + DRB + TOV + PF, data = reg90s))
+get_regression_table(lm(formula = Win ~ FG + FGP + TPP + FTA + FTP + ORB + DRB + TOV + PF, data = reg90s))
+
+```
+### Regression of the 90's after stepwise:
++ R2 of .64
++ MSE = 0.07287
++ Highest Predictor again is Field goal percentage, Three pointer percentage  & Free Throw percentage
+
+
+
+## Regression of the 2000's
+
+```{r}
+reg00s <- champ %>% filter(Year >= 2000 & Year <= 2009) %>% select(Win, Home, FG, FGA, FGP, TP, TPA, TPP, FT, FTA,FTP, ORB, DRB, TRB, AST, STL, BLK, TOV, PF, PTS) %>% drop_na()
+
+
+model00s <- lm(Win ~ Home + FG + FGA + FGP + TP + TPA + TPP + FT + FTA + FTP + ORB + DRB + TRB + AST + STL + BLK + TOV + PF + PTS, data = reg00s)
+
+# Regression Table & Summaries
+model00s %>% get_regression_table()
+model00s %>% get_regression_summaries()
+
+# Stepwise function
+step(model00s)
+
+# Regression Summaries & Table of 00s Model
+get_regression_summaries(lm(formula = Win ~ FG + FGA + TPA + FTP + DRB + TOV, data = reg00s))
+get_regression_table(lm(formula = Win ~ FG + FGA + TPA + FTP + DRB + TOV, data = reg00s))
+
+```
+### Regression of the 2000's after stepwise:
++ R2 of .65
++ MSE = 0.0672
++ Highest Predictor again is Free Throw percentage
+
+
+
+## Regression of the 2010's
+
+```{r}
+reg10s <- champ %>% filter(Year >= 2010 & Year <= 2018) %>% select(Win, Home, FG, FGA, FGP, TP, TPA, TPP, FT, FTA,FTP, ORB, DRB, TRB, AST, STL, BLK, TOV, PF, PTS) %>% drop_na()
+
+
+model10s <- lm(Win ~ Home + FG + FGA + FGP + TP + TPA + TPP + FT + FTA + FTP + ORB + DRB + TRB + AST + STL + BLK + TOV + PF + PTS, data = reg10s)
+
+# Regression Table & Summaries
+model10s %>% get_regression_table()
+model10s %>% get_regression_summaries()
+
+# Stepwise function
+step(model10s)
+
+# Regression Summaries & Table of 00s Model
+get_regression_summaries(lm(formula = Win ~ FG + FGA + FGP + TP + TPA + TPP + FTA + FTP + DRB + AST + STL + TOV, data = reg10s))
+get_regression_table(lm(formula = Win ~ FG + FGA + FGP + TP + TPA + TPP + FTA + FTP + DRB + AST + STL + TOV, data = reg10s))
+
+```
+
+### Regression of the 10's after stepwise:
++ R2 of .685
++ MSE = 0.0671
++ Highest Predictor again is Field goal percentage, Three pointer percentage, Free Throw percentage & Three pointers made 
+
+## Regression for Points
+
+```{r}
+
+champno <- champ %>% drop_na()
+pointsReg <- lm(PTS ~ Home + ORB + DRB + TRB + AST + STL + BLK + TOV + PF, data = champno)
+
+# Regression Table & Summaries
+pointsReg %>% get_regression_table()
+pointsReg %>% get_regression_summaries()
+
+# Stepwise function
+step(pointsReg)
+
+
+# Regression Summaries & Table of 00s Model
+get_regression_summaries(lm(formula = PTS ~ DRB + AST + STL + TOV + PF, data = champno))
+get_regression_table(lm(formula = PTS ~ DRB + AST + STL + TOV + PF, data = champno))
+```
+  
+  
+## Regression with "No Points"
+
+```{r}
+
+champno <- champ %>% drop_na()
+nopoints <- lm(Win ~ Home + ORB + DRB + TRB + AST + STL + BLK + TOV + PF, data = champno)
+
+# Regression Table & Summaries
+nopoints %>% get_regression_table()
+nopoints %>% get_regression_summaries()
+
+# Stepwise function
+step(nopoints)
+
+
+# Regression Summaries & Table of 00s Model
+get_regression_summaries(lm(formula = Win ~ DRB + AST + STL + TOV, data = champno))
+get_regression_table(lm(formula = Win ~ DRB + AST + STL + TOV, data = champno))
+```
+### Regression with "No Points" after stepwise:
++ Low R2
++ MSE = 0.1512
++ Highest Predictor was Defensive rebound
+
+
+
+# Takeaways
++ Not a surprise, Field goal percentage was often the highest predictor
++ Noticed increase in Three pointer statistics (TP,TPA,TPP)
++ High Field goal attempts doesn't mean high points
++ More cleaning
+
+
+
+
+```{r}
+
+#autoplot(ts(RaRb1$HPQ)) +
+ # autolayer(holt(RaRb1$HPQ), PI = F, series = "Regular Holt Method") +
+  #autolayer(holt(RaRb1$HPQ, damped = T, phi = 0.85), PI = F, series = "Damped Holt Method") +
+  #ggtitle("Holt and Damped Holt Forecasts",
+    #      subtitle = "Hewlett-Packard Quarterly Stock Return")
+
+```
+
+
+
